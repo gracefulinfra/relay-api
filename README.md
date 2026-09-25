@@ -1,5 +1,7 @@
 # relay-api
 
+[![ci](https://github.com/gracefulinfra/relay-api/actions/workflows/ci.yml/badge.svg?branch=main)](https://github.com/gracefulinfra/relay-api/actions/workflows/ci.yml)
+
 Go modular monolith for Relay: catalog, publishing, feeds, community, analytics, and billing modules, with River job dispatch.
 
 Part of **Relay**, a cloud-agnostic podcast network platform built as a portfolio project.
