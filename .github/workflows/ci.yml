@@ -118,6 +118,17 @@ jobs:
           DIGEST: ${{ steps.build.outputs.digest }}
         run: cosign attest --yes --type spdxjson --predicate sbom.spdx.json "${IMAGE}@${DIGEST}"
       - if: github.event_name == 'push'
+        name: Verify signature and SBOM attestation
+        env:
+          DIGEST: ${{ steps.build.outputs.digest }}
+          IDENTITY: https://github.com/${{ github.workflow_ref }}
+          ISSUER: https://token.actions.githubusercontent.com
+        run: |
+          cosign verify "${IMAGE}@${DIGEST}" --certificate-identity "$IDENTITY" --certificate-oidc-issuer "$ISSUER"
+          cosign verify-attestation --type spdxjson "${IMAGE}@${DIGEST}" \
+            --certificate-identity "$IDENTITY" --certificate-oidc-issuer "$ISSUER" > /dev/null
+          echo "Verified signature and spdxjson attestation for ${IMAGE}@${DIGEST}"
+      - if: github.event_name == 'push'
         name: Summary
         env:
           DIGEST: ${{ steps.build.outputs.digest }}
