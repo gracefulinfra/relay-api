@@ -9,7 +9,11 @@ Each entry: the symptom, how to confirm it, and what to do.
 - **Impact**: none on serving traffic. The Deployments are ordered after the Job, so the previous release
   keeps running against the last good schema. Each migration runs in its own transaction, so nothing is half-applied.
 - **Fix**: correct the migration in a new relay-api release (migrations are forward-only; never edit an
-  applied one) and sync again. `relay-migrate status` (`kubectl -n relay exec deploy/relay-api -- /relay-migrate status`)
+  applied one) and sync again. To back out instead, set `image.digest` back to the previous release: the
+  live Deployments never changed, so Argo CD reports Synced at once and skips auto-sync. The failed Job
+  stays until the next sync, so run `argocd app sync relay-api` to replace it with a green one. Do not
+  delete the Application's `.operation` by hand: that orphans the running operation. Use
+  `argocd app terminate-op relay-api` if one is stuck. `relay-migrate status` (`kubectl -n relay exec deploy/relay-api -- /relay-migrate status`)
   shows which versions are applied.
 
 ## Pods are not ready (`/readyz` 503)
