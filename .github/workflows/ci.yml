@@ -42,9 +42,32 @@ jobs:
       - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
         with:
           go-version-file: go.mod
-      - run: go test -race -count=1 -coverprofile=coverage.out ./...
-      - name: Pending test suites
-        run: echo "::notice title=Pending tests::Only build-info unit tests ran. Integration tests come later."
+      # Unit and integration tests. Integration tests start PostgreSQL with testcontainers-go on the
+      # runner's Docker; with -v the log shows each test, so a skipped database suite is visible.
+      - run: go test -race -count=1 -v -coverprofile=coverage.out ./... | tee test.log
+        shell: bash
+      - name: Fail if database tests were skipped
+        shell: bash
+        run: |
+          if grep -q -- '--- SKIP' test.log; then
+            grep -- '--- SKIP' test.log
+            echo "::error::Integration tests were skipped; Docker must be available in CI."
+            exit 1
+          fi
+          echo "Passed: $(grep -c -- '--- PASS' test.log) tests"
+
+  generated:
+    runs-on: ubuntu-24.04
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
+        with:
+          go-version-file: go.mod
+      - run: make check-generated
 
   vuln:
     runs-on: ubuntu-24.04
@@ -60,7 +83,7 @@ jobs:
       - run: go tool govulncheck ./...
 
   image:
-    needs: [lint, test, vuln]
+    needs: [lint, test, vuln, generated]
     runs-on: ubuntu-24.04
     permissions:
       contents: read

@@ -1,0 +1,14 @@
+# sqlc (pinned: SQLC_IMAGE in the Makefile). Run `make generate`; CI fails if the output drifts.
+# Each module gets its own package and its own queries; a module never queries another module's schema.
+version: "2"
+sql:
+  - engine: postgresql
+    schema: db/migrations/00001_baseline.sql
+    queries: db/queries/idempotency.sql
+    gen:
+      go:
+        package: idempotencydb
+        out: internal/platform/idempotency/idempotencydb
+        sql_package: pgx/v5
+        emit_interface: false
+        emit_empty_slices: true
