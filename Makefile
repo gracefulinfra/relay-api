@@ -43,7 +43,7 @@ generate: ## sqlc queries and the 501 stubs for the pinned contract
 	go generate ./api/...
 
 check-generated: generate ## Fail if generated code differs from what is committed
-	@git diff --exit-code -- internal/platform/idempotency/idempotencydb api/unimplemented.gen.go || { \
+	@git diff --exit-code -- internal/platform/idempotency/idempotencydb internal/platform/access/accessdb internal/platform/audit/auditdb api/unimplemented.gen.go || { \
 	  echo "Generated code is stale: run make generate and commit the result."; exit 1; }
 
 build: ## Build relay-api, relay-worker, and relay-migrate into bin/

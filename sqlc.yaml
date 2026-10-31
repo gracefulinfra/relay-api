@@ -12,3 +12,33 @@ sql:
         sql_package: pgx/v5
         emit_interface: false
         emit_empty_slices: true
+  - engine: postgresql
+    schema: [db/migrations/00001_baseline.sql, db/migrations/00003_staff_auth.sql]
+    queries: db/queries/staff.sql
+    gen:
+      go:
+        package: accessdb
+        out: internal/platform/access/accessdb
+        sql_package: pgx/v5
+        emit_interface: false
+        emit_empty_slices: true
+        overrides:
+          - {db_type: "timestamptz", go_type: "time.Time"}
+          - {db_type: "timestamptz", nullable: true, go_type: {import: "time", type: "Time", pointer: true}}
+          - {db_type: "uuid", go_type: "github.com/google/uuid.UUID"}
+          - {db_type: "uuid", nullable: true, go_type: "github.com/google/uuid.NullUUID"}
+  - engine: postgresql
+    schema: [db/migrations/00001_baseline.sql, db/migrations/00003_staff_auth.sql]
+    queries: db/queries/audit.sql
+    gen:
+      go:
+        package: auditdb
+        out: internal/platform/audit/auditdb
+        sql_package: pgx/v5
+        emit_interface: false
+        emit_empty_slices: true
+        overrides:
+          - {db_type: "timestamptz", go_type: "time.Time"}
+          - {db_type: "timestamptz", nullable: true, go_type: {import: "time", type: "Time", pointer: true}}
+          - {db_type: "uuid", go_type: "github.com/google/uuid.UUID"}
+          - {db_type: "uuid", nullable: true, go_type: "github.com/google/uuid.NullUUID"}

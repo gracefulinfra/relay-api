@@ -77,3 +77,13 @@ func snake(slug string) string {
 	}
 	return string(b)
 }
+
+// Error carries a Problem out of a handler as an ordinary error. server maps it to the response, so a
+// strict-server handler can return problem.Err(problem.NotFound("...")) for any status without a
+// per-operation response type.
+type Error struct{ Problem Problem }
+
+func (e Error) Error() string { return e.Problem.Title + ": " + e.Problem.Detail }
+
+// Err wraps p as an error.
+func Err(p Problem) error { return Error{Problem: p} }

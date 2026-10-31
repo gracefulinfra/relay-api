@@ -10,10 +10,13 @@
 // overrides operations as modules implement them.
 package api
 
+import "github.com/gracefulinfra/relay-api/internal/platform/access"
+
 //go:generate go run ./internal/genstubs unimplemented.gen.go
 
 // Server implements the contract. Operations move from Unimplemented to real module handlers slice by
 // slice, starting with P1-02.
 type Server struct {
 	Unimplemented
+	Access *access.Service
 }

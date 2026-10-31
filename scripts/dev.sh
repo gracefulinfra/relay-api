@@ -47,6 +47,9 @@ else
   export OTEL_TRACES_EXPORTER="${OTEL_TRACES_EXPORTER:-none}"
 fi
 export RELAY_CORS_ALLOWED_ORIGINS="${RELAY_CORS_ALLOWED_ORIGINS:-http://localhost:5173}"
+# Staff tokens come from the Compose dev stack's Keycloak. The issuer must equal the token's iss, which
+# is Keycloak's configured hostname; override it if the dev stack uses another one.
+export RELAY_OIDC_ISSUER="${RELAY_OIDC_ISSUER:-http://localhost:18180/realms/relay-staff}"
 export RELAY_LOG_LEVEL="${RELAY_LOG_LEVEL:-debug}"
 
 case "$cmd" in

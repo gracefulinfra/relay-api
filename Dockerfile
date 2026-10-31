@@ -1,7 +1,7 @@
 # syntax=docker/dockerfile:1
 # One image, three entrypoints: /relay-api (default), /relay-worker, /relay-migrate. The chart picks the
 # entrypoint per workload. Base images are pinned by digest; Renovate keeps them current.
-FROM --platform=$BUILDPLATFORM golang:1.27.1-trixie@sha256:433790e515d27dc6003e847e644cc0af956985cf315c1c58a3b73ee2dd305183 AS build
+FROM --platform=$BUILDPLATFORM golang:1.27.3-trixie@sha256:c65ecfe613b539ac74c62a4c3b2c27e8f8a6076384c8f27e8a3c0f3be17cc385 AS build
 WORKDIR /src
 COPY go.mod go.sum ./
 RUN go mod download

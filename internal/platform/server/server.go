@@ -65,7 +65,12 @@ func New(impl relayapi.StrictServerInterface, o Options) http.Handler {
 			auth.Authorize(o.Authorizer),
 			httpx.RecordRoute,
 		},
+		// Path and query binding fails before any per-operation middleware runs, so authorize here too.
 		ErrorHandlerFunc: func(w http.ResponseWriter, r *http.Request, err error) {
+			if !auth.Permit(o.Authorizer, r) {
+				problem.Write(w, r, problem.Forbidden())
+				return
+			}
 			problem.Write(w, r, problem.BadRequest(err.Error()))
 		},
 	})
@@ -86,6 +91,11 @@ func responseError(log *slog.Logger) func(http.ResponseWriter, *http.Request, er
 	return func(w http.ResponseWriter, r *http.Request, err error) {
 		if errors.Is(err, ErrNotImplemented) {
 			problem.Write(w, r, problem.NotImplemented())
+			return
+		}
+		var pe problem.Error
+		if errors.As(err, &pe) {
+			problem.Write(w, r, pe.Problem)
 			return
 		}
 		if errors.Is(err, context.Canceled) {
