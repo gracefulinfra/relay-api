@@ -33,8 +33,8 @@ func TestFirstInstallAppliesEveryMigration(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if len(res) != 2 {
-		t.Errorf("applied %d migrations, want 2", len(res))
+	if len(res) != 3 {
+		t.Errorf("applied %d migrations, want 3", len(res))
 	}
 	if ok, err := m.Current(ctx); err != nil || !ok {
 		t.Fatalf("after up: current=%v err=%v", ok, err)
@@ -78,7 +78,7 @@ func TestUpIsIdempotent(t *testing.T) {
 func TestDatabaseAheadOfBinaryIsCurrent(t *testing.T) {
 	ctx := context.Background()
 	pool := testdb.New(t)
-	newer := withExtra(t, "00003_newer.sql", "-- +goose Up\nCREATE TABLE catalog.added_by_newer_release (id int);\n")
+	newer := withExtra(t, "00004_newer.sql", "-- +goose Up\nCREATE TABLE catalog.added_by_newer_release (id int);\n")
 	mNew, err := db.NewMigratorFS(pool, newer)
 	if err != nil {
 		t.Fatal(err)
@@ -103,7 +103,7 @@ func TestDatabaseAheadOfBinaryIsCurrent(t *testing.T) {
 func TestFailedUpgradeLeavesDatabaseAtLastGoodVersion(t *testing.T) {
 	ctx := context.Background()
 	pool := testdb.New(t)
-	bad := withExtra(t, "00003_broken.sql",
+	bad := withExtra(t, "00004_broken.sql",
 		"-- +goose Up\nCREATE TABLE catalog.half_done (id int);\nALTER TABLE catalog.does_not_exist ADD COLUMN x int;\n")
 	m, err := db.NewMigratorFS(pool, bad)
 	if err != nil {
@@ -114,8 +114,8 @@ func TestFailedUpgradeLeavesDatabaseAtLastGoodVersion(t *testing.T) {
 		t.Fatal("broken migration succeeded")
 	}
 	cur, _, err := m.Versions(ctx)
-	if err != nil || cur != 2 {
-		t.Fatalf("version after failure = %d (err %v), want 2", cur, err)
+	if err != nil || cur != 3 {
+		t.Fatalf("version after failure = %d (err %v), want 3", cur, err)
 	}
 	var half bool
 	_ = pool.QueryRow(ctx, `SELECT to_regclass('catalog.half_done') IS NOT NULL`).Scan(&half)

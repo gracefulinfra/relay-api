@@ -38,3 +38,18 @@ pg_stat_activity WHERE application_name = 'relay-api' ORDER BY 2 DESC`.
 The cleanup job is not running. Check the worker is ready and look for `platform.idempotency_cleanup` in
 `SELECT state, count(*) FROM river.river_job WHERE kind = 'platform.idempotency_cleanup' GROUP BY 1`.
 `relay_idempotency_keys_expired_total` on the worker's `/metrics` should rise over time.
+
+## Staff get `401` or `403`
+
+- **`401` for everyone:** the API cannot validate tokens. Check `RELAY_OIDC_ISSUER` equals the token's `iss`
+  exactly (Keycloak's public URL, `KC_HOSTNAME`), and that the pod can reach `RELAY_OIDC_JWKS_URL`
+  (NetworkPolicy `relay-api-api` allows Keycloak :8080). Debug logs say `token rejected` with a class
+  (`expired`, `issuer mismatch`, `audience`, `signature or algorithm`, `not-before`), never the token.
+  After a Keycloak key rotation no restart is needed; an unknown `kid` triggers a JWKS refetch.
+- **`403` for one person, on everything:** their account is disabled. They appear in `GET /staff-users`;
+  an admin grants a role on a show (`PUT /shows/{showId}/grants/{staffUserId}`), which enables them.
+- **`403` on one show:** they lack the role the operation needs on that show (docs/access.md).
+- **No admin exists** (fresh install): `relay-api bootstrap-admin --subject <id>` after that person signs in
+  once. It refuses when an admin exists; recovery from a lost admin is a database update by the operator
+  (`UPDATE platform.staff_users SET network_admin = true, enabled = true WHERE ...`) plus a manual
+  `platform.audit_events` row.

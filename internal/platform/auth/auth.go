@@ -9,7 +9,9 @@ package auth
 
 import (
 	"context"
+	"net"
 	"net/http"
+	"net/netip"
 	"strings"
 
 	"github.com/gracefulinfra/relay-api/internal/platform/problem"
@@ -20,6 +22,10 @@ import (
 type Actor struct {
 	ID        string
 	Anonymous bool
+	// Enabled is false for a staff user no admin has granted a role to yet (or one an admin disabled).
+	// A disabled actor is authenticated but is refused by every Authorizer.
+	Enabled      bool
+	NetworkAdmin bool
 }
 
 // AnonymousActor is the actor for /v0/public/* requests.
@@ -59,6 +65,27 @@ func ActorFrom(ctx context.Context) (Actor, bool) {
 	return a, ok
 }
 
+type clientIPKey struct{}
+
+// ClientIPFrom returns the peer address recorded for audit events. It is the TCP peer, which behind the
+// Gateway is the proxy; honouring a trusted X-Forwarded-For is a follow-up (docs/follow-ups.md).
+func ClientIPFrom(ctx context.Context) (netip.Addr, bool) {
+	a, ok := ctx.Value(clientIPKey{}).(netip.Addr)
+	return a, ok
+}
+
+func withClientIP(r *http.Request) context.Context {
+	host, _, err := net.SplitHostPort(r.RemoteAddr)
+	if err != nil {
+		return r.Context()
+	}
+	a, err := netip.ParseAddr(host)
+	if err != nil {
+		return r.Context()
+	}
+	return context.WithValue(r.Context(), clientIPKey{}, a.Unmap())
+}
+
 // PublicPrefix is the anonymous published-content API. It never varies by credentials, so credentials
 // sent there are ignored rather than checked.
 const PublicPrefix = "/v0/public/"
@@ -68,6 +95,7 @@ const PublicPrefix = "/v0/public/"
 func Authenticate(a Authenticator) func(http.Handler) http.Handler {
 	return func(next http.Handler) http.Handler {
 		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			r = r.WithContext(withClientIP(r))
 			if strings.HasPrefix(r.URL.Path, PublicPrefix) {
 				next.ServeHTTP(w, r.WithContext(WithActor(r.Context(), AnonymousActor)))
 				return
@@ -83,21 +111,30 @@ func Authenticate(a Authenticator) func(http.Handler) http.Handler {
 	}
 }
 
+// Permit reports whether the request may proceed to its handler: the same decision Authorize makes.
+// The server also calls it before answering a request-validation error, so an unauthorized caller gets
+// 403 rather than learning from a 400 what the operation expects.
+func Permit(z Authorizer, r *http.Request) bool {
+	actor, ok := ActorFrom(r.Context())
+	if !ok {
+		return false
+	}
+	if actor.Anonymous && strings.HasPrefix(r.URL.Path, PublicPrefix) {
+		return true
+	}
+	return !actor.Anonymous && z.Authorize(r.Context(), actor, r)
+}
+
 // Authorize is the per-operation middleware (it runs after routing). Public operations are allowed;
 // everything else asks the Authorizer, and a refusal is 403.
 func Authorize(z Authorizer) func(http.Handler) http.Handler {
 	return func(next http.Handler) http.Handler {
 		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-			actor, ok := ActorFrom(r.Context())
-			if !ok {
+			if _, ok := ActorFrom(r.Context()); !ok {
 				problem.Write(w, r, problem.Unauthorized())
 				return
 			}
-			if actor.Anonymous && strings.HasPrefix(r.URL.Path, PublicPrefix) {
-				next.ServeHTTP(w, r)
-				return
-			}
-			if actor.Anonymous || !z.Authorize(r.Context(), actor, r) {
+			if !Permit(z, r) {
 				problem.Write(w, r, problem.Forbidden())
 				return
 			}

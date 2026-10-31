@@ -154,11 +154,17 @@ func serve(pool *pgxpool.Pool, o Options, next http.Handler, w http.ResponseWrit
 		return
 	}
 	headers, _ := json.Marshal(pick(rec.header))
+	respBody := rec.body.Bytes()
+	if respBody == nil {
+		// A 204 has no body. pgx writes a nil slice as NULL, which the table's response_status/response_body
+		// check rejects; an empty non-nil slice is stored as an empty bytea.
+		respBody = []byte{}
+	}
 	err = q.CompleteIdempotencyKey(ctx, idempotencydb.CompleteIdempotencyKeyParams{
 		Actor: scope.Actor, Method: scope.Method, Path: scope.Path, Key: scope.Key,
 		ResponseStatus:  pgtype.Int2{Int16: int16(rec.status), Valid: true}, //nolint:gosec // 200-499
 		ResponseHeaders: headers,
-		ResponseBody:    rec.body.Bytes(),
+		ResponseBody:    respBody,
 	})
 	if err == nil {
 		err = tx.Commit(ctx)

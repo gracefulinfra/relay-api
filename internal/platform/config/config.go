@@ -37,6 +37,14 @@ type Config struct {
 	// MaxRequestBody caps request bodies on the JSON API. Uploads use tus (P1-04), not this path.
 	MaxRequestBody int64 `env:"RELAY_MAX_REQUEST_BODY" envDefault:"1048576" json:"maxRequestBody"`
 
+	// OIDCIssuer is the exact issuer of the relay-staff Keycloak realm. relay-api refuses to start without
+	// it (see StaffAuth); relay-worker and relay-migrate do not use it.
+	OIDCIssuer string `env:"RELAY_OIDC_ISSUER" json:"oidcIssuer"`
+	// OIDCJWKSURL is where the signing keys are fetched. Empty means the Keycloak path under the issuer.
+	OIDCJWKSURL string `env:"RELAY_OIDC_JWKS_URL" json:"oidcJwksUrl"`
+	// OIDCAudience is the audience (the relay-api client) every staff token must carry.
+	OIDCAudience string `env:"RELAY_OIDC_AUDIENCE" envDefault:"relay-api" json:"oidcAudience"`
+
 	ShutdownTimeout time.Duration `env:"RELAY_SHUTDOWN_TIMEOUT" envDefault:"20s" json:"shutdownTimeout"`
 
 	// TracesExporter is "otlp" (OTEL_EXPORTER_OTLP_* configure the endpoint) or "none".
@@ -82,10 +90,31 @@ func (c Config) Validate() error {
 	if c.MaxRequestBody <= 0 {
 		errs = append(errs, errors.New("RELAY_MAX_REQUEST_BODY must be positive"))
 	}
+	for name, v := range map[string]string{"RELAY_OIDC_ISSUER": c.OIDCIssuer, "RELAY_OIDC_JWKS_URL": c.OIDCJWKSURL} {
+		if v == "" {
+			continue
+		}
+		if u, err := url.Parse(v); err != nil || (u.Scheme != "https" && u.Scheme != "http") || u.Host == "" || u.User != nil {
+			errs = append(errs, fmt.Errorf("%s must be an http(s) URL without credentials", name))
+		}
+	}
 	if c.TracesExporter != "otlp" && c.TracesExporter != "none" {
 		errs = append(errs, errors.New(`OTEL_TRACES_EXPORTER must be "otlp" or "none"`))
 	}
 	return errors.Join(errs...)
+}
+
+// StaffAuth returns the settings relay-api needs to validate staff tokens, or an error naming what is
+// missing. The JWKS URL defaults to Keycloak's certs endpoint under the issuer.
+func (c Config) StaffAuth() (issuer, jwksURL, audience string, err error) {
+	if c.OIDCIssuer == "" {
+		return "", "", "", errors.New("RELAY_OIDC_ISSUER is required for relay-api")
+	}
+	jwksURL = c.OIDCJWKSURL
+	if jwksURL == "" {
+		jwksURL = strings.TrimRight(c.OIDCIssuer, "/") + "/protocol/openid-connect/certs"
+	}
+	return c.OIDCIssuer, jwksURL, c.OIDCAudience, nil
 }
 
 // Redacted returns the config as a map for --print-config, with every secret field replaced. A URL

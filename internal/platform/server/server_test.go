@@ -30,7 +30,7 @@ import (
 func TestMain(m *testing.M) { testdb.Main(m) }
 
 // panicky overrides one operation to prove panic recovery through the real generated router.
-type panicky struct{ api.Server }
+type panicky struct{ api.Unimplemented }
 
 func (panicky) GetPublicNetwork(context.Context, relayapi.GetPublicNetworkRequestObject) (relayapi.GetPublicNetworkResponseObject, error) {
 	panic("boom")
